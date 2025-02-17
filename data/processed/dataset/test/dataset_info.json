@@ -1,0 +1,71 @@
+{
+  "builder_name": "parquet",
+  "citation": "",
+  "config_name": "question-answer-passages",
+  "dataset_name": "rag-mini-bioasq",
+  "dataset_size": 1982819,
+  "description": "",
+  "download_checksums": {
+    "hf://datasets/rag-datasets/rag-mini-bioasq@224a87f64a5c3a720b5bc627cf760f543b2f1e79/data/test.parquet/part.0.parquet": {
+      "num_bytes": 1290026,
+      "checksum": null
+    }
+  },
+  "download_size": 1290026,
+  "features": {
+    "question": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "answer": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "relevant_passage_ids": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "id": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "input_ids": {
+      "feature": {
+        "dtype": "int32",
+        "_type": "Value"
+      },
+      "_type": "Sequence"
+    },
+    "attention_mask": {
+      "feature": {
+        "dtype": "int8",
+        "_type": "Value"
+      },
+      "_type": "Sequence"
+    },
+    "labels": {
+      "feature": {
+        "dtype": "int64",
+        "_type": "Value"
+      },
+      "_type": "Sequence"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 3272845,
+  "splits": {
+    "test": {
+      "name": "test",
+      "num_bytes": 1982819,
+      "num_examples": 4719,
+      "dataset_name": "rag-mini-bioasq"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}
