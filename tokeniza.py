@@ -3,32 +3,49 @@ from transformers import BartTokenizer
 from datasets import load_from_disk
 
 
-def tokenize_dataset(dataset_path="data/raw/dataset", model_name="facebook/bart-base",
-                     save_path="data/processed/dataset"):
-    """Carica, tokenizza e salva il dataset locale."""
+def tokenize_dataset(dataset_path="data/raw/dataset", model_name="facebook/bart-base",save_path="data/processed/dataset", max_length=512):
+    """Tokenizza il dataset (question e answer) e lo salva su disco."""
 
-    # Caricare il dataset salvato da main.py
+    # Caricare il dataset
     dataset = load_from_disk(dataset_path)
 
     # Inizializzare il tokenizer
     tokenizer = BartTokenizer.from_pretrained(model_name)
 
     def tokenize_function(examples):
-        """Tokenizza domande e risposte."""
+        """Tokenizza batch di question e answer garantendo coerenza nelle lunghezze."""
+
+        # Tokenizzazione delle domande
         tokenized_inputs = tokenizer(
-            examples["question"],  # Tokenizza la domanda
+            examples["question"],
             padding="max_length",
-            truncation=True
+            truncation=True,
+            max_length=max_length
         )
+
+        # Controllo e tokenizzazione delle risposte
+        if "answer" in examples and isinstance(examples["answer"], list):
+            answers = [ans if isinstance(ans, str) else "" for ans in examples["answer"]]
+        else:
+            answers = [""] * len(examples["question"])  # Se non ci sono risposte, riempi con stringhe vuote
+
         tokenized_answers = tokenizer(
-            examples["answer"],  # Tokenizza la risposta
+            answers,
             padding="max_length",
-            truncation=True
+            truncation=True,
+            max_length=max_length
         )
-        tokenized_inputs["labels"] = tokenized_answers["input_ids"]
+
+        # Aggiunta delle labels con padding coerente
+        labels = tokenized_answers["input_ids"]
+        labels = [[label if label != tokenizer.pad_token_id else -100 for label in ans] for ans in labels]
+
+        # Aggiungere "labels" ai token
+        tokenized_inputs["labels"] = labels
+
         return tokenized_inputs
 
-    # Applicare la tokenizzazione a tutto il dataset
+    # Applicare la tokenizzazione all'intero dataset
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
 
     # Creare la cartella se non esiste
@@ -36,20 +53,6 @@ def tokenize_dataset(dataset_path="data/raw/dataset", model_name="facebook/bart-
 
     # Salvare il dataset tokenizzato
     tokenized_dataset.save_to_disk(save_path)
-    print(f"\n Dataset tokenizzato e salvato in {save_path}")
-
-    # Mostrare alcuni esempi dal dataset tokenizzato
-    print("\n Esempi di dati tokenizzati:")
-
-    # Controllare se il dataset ha "test" o "train"
-    split_name = "test" if "test" in tokenized_dataset else "train"
-
-    for i in range(min(3, len(tokenized_dataset[split_name]))):  # Mostra fino a 3 esempi
-        print(f"\n  Esempio {i + 1}:")
-        print(f" input_ids: {tokenized_dataset[split_name][i]['input_ids'][:20]}...")  # Primi 20 token
-        print(f" labels: {tokenized_dataset[split_name][i]['labels'][:20]}...")
+    print(f" Dataset tokenizzato e salvato in {save_path}")
 
     return tokenized_dataset
-
-
-
