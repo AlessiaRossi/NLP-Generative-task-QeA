@@ -12,6 +12,8 @@ def train_model(dataset_path="data/processed/dataset", model_name="facebook/bart
     # Verifica se è disponibile una GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    print(" GPU available:", torch.cuda.is_available())
+    print(" Using device:", device)
     # Caricare il dataset tokenizzato
     dataset = load_from_disk(dataset_path)
 
@@ -57,9 +59,10 @@ def train_model(dataset_path="data/processed/dataset", model_name="facebook/bart
         output_dir="results",
         evaluation_strategy="epoch" if eval_dataset else "no",
         save_strategy="epoch" if eval_dataset else "no",
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
-        num_train_epochs=10,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
+        gradient_accumulation_steps=2,
+        num_train_epochs=8,
         weight_decay=0.01,
         logging_dir="logs",
         logging_steps=100,
