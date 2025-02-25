@@ -1,58 +1,43 @@
 import os
 from transformers import BartTokenizer
-from datasets import load_from_disk
+from datasets import load_dataset, load_from_disk
+from transformers import (T5ForConditionalGeneration, T5Tokenizer, Trainer, TrainingArguments, EarlyStoppingCallback, TrainerCallback)
 
-
-def tokenize_dataset(dataset_path="data/raw/dataset", model_name="facebook/bart-base",save_path="data/processed/dataset", max_length=512):
+def tokenize_dataset(dataset_path=RAW_DATASET_PATH, model_name="google-t5/t5-small", save_path=PROCESSED_DATASET_PATH, max_length=512):
     """Tokenizza il dataset (question e answer) e lo salva su disco."""
-
-    # Caricare il dataset
     dataset = load_from_disk(dataset_path)
-
-    # Inizializzare il tokenizer
-    tokenizer = BartTokenizer.from_pretrained(model_name)
+    tokenizer = T5Tokenizer.from_pretrained(model_name, legacy=False)
 
     def tokenize_function(examples):
-        """Tokenizza batch di question e answer garantendo coerenza nelle lunghezze."""
-
-        # Tokenizzazione delle domande
+        inputs = [f"question: {q} context: {' '.join(p)}" for q, p in zip(examples["question"], examples["relevant_passage_ids"])]
         tokenized_inputs = tokenizer(
-            examples["question"],
+            inputs,
             padding="max_length",
             truncation=True,
             max_length=max_length
         )
 
-        # Controllo e tokenizzazione delle risposte
-        if "answer" in examples and isinstance(examples["answer"], list):
-            answers = [ans if isinstance(ans, str) else "" for ans in examples["answer"]]
-        else:
-            answers = [""] * len(examples["question"])  # Se non ci sono risposte, riempi con stringhe vuote
-
+        answers = [ans if isinstance(ans, str) else "" for ans in examples.get("answer", [""] * len(examples["question"]))]
         tokenized_answers = tokenizer(
             answers,
             padding="max_length",
             truncation=True,
             max_length=max_length
         )
-
-        # Aggiunta delle labels con padding coerente
         labels = tokenized_answers["input_ids"]
         labels = [[label if label != tokenizer.pad_token_id else -100 for label in ans] for ans in labels]
 
-        # Aggiungere "labels" ai token
         tokenized_inputs["labels"] = labels
-
         return tokenized_inputs
 
-    # Applicare la tokenizzazione all'intero dataset
-    tokenized_dataset = dataset.map(tokenize_function, batched=True)
-
-    # Creare la cartella se non esiste
+    first_split = list(dataset.keys())[0]
+    tokenized_dataset = dataset.map(
+        tokenize_function,
+        batched=True,
+        remove_columns=dataset[first_split].column_names
+    )
+    print(f"Split disponibili nel dataset caricato: {dataset.keys()}")
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
-    # Salvare il dataset tokenizzato
     tokenized_dataset.save_to_disk(save_path)
-    print(f" Dataset tokenizzato e salvato in {save_path}")
-
+    print(f"Dataset tokenizzato e salvato in {save_path}")
     return tokenized_dataset
