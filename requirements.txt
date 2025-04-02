@@ -1,0 +1,12 @@
+torch
+transformers
+datasets
+nltk
+rouge_score
+tqdm
+peft
+faiss-cpu  # or faiss-gpu if using GPU
+sentence-transformers
+rank_bm25
+numpy
+scikit-learn
