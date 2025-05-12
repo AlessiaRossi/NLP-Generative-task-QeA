@@ -2,6 +2,7 @@ import os
 import json
 from datetime import datetime
 import torch
+import numpy as np
 from transformers import (
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
@@ -12,14 +13,15 @@ from transformers import (
 from peft import LoraConfig, get_peft_model, TaskType, PeftModel
 
 from config import logger, device, MODEL_NAME
+from utils.monitoring import plot_training_history, analyze_learning_curve
 
-def fine_tune_model(qa_system, output_dir="./fine_tuned_model", num_train_epochs=3, force_train=False):
+def fine_tune_model(qa_system, output_dir="./fine_tuned_model", num_train_epochs=15, force_train=False):
     """Fine-tune the model on the BioAsq dataset
 
     Args:
         qa_system: The QA system instance
         output_dir: Directory to save the fine-tuned model
-        num_train_epochs: Number of training epochs
+        num_train_epochs: Number of training epochs (default increased to 15 for proper early stopping)
         force_train: If True, force re-training even if a model already exists
 
     Returns:
@@ -129,16 +131,18 @@ def fine_tune_model(qa_system, output_dir="./fine_tuned_model", num_train_epochs
         gradient_accumulation_steps=4,
         num_train_epochs=num_train_epochs,
         save_strategy="epoch",
-        save_total_limit=2,
+        save_total_limit=3,
         evaluation_strategy="epoch",
         learning_rate=3e-5,
         weight_decay=0.01,
         load_best_model_at_end=True,
         metric_for_best_model="loss",
+        logging_strategy="epoch",
+        report_to=["tensorboard"],
     )
-    
-    # Add early stopping
-    early_stopping_callback = EarlyStoppingCallback(early_stopping_patience=2)
+
+    # Add early stopping with increased patience
+    early_stopping_callback = EarlyStoppingCallback(early_stopping_patience=5)
     
     # Initialize trainer with both train and eval datasets
     trainer = Trainer(
@@ -153,13 +157,23 @@ def fine_tune_model(qa_system, output_dir="./fine_tuned_model", num_train_epochs
     # Start training
     logger.info("Starting fine-tuning...")
     trainer.train()
+    logger.info("Fine-tuning completed.")
     
     # Save the model
     logger.info(f"Saving fine-tuned model to {full_output_dir}")
     trainer.save_model(full_output_dir)
     qa_system.tokenizer.save_pretrained(full_output_dir)
     
-    # Also save training metadata
+    # Generate training visualizations and analysis
+    plot_path = plot_training_history(trainer, full_output_dir)
+    if plot_path:
+        logger.info(f"Training history plot saved to {plot_path}")
+    
+    analysis = analyze_learning_curve(trainer, full_output_dir)
+    if analysis and 'error' not in analysis:
+        logger.info(f"Learning curve analysis: {analysis['recommendation']}")
+    
+    # Also save training metadata with analysis results
     with open(os.path.join(full_output_dir, "training_metadata.json"), 'w') as f:
         metadata = {
             "date_trained": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -167,11 +181,17 @@ def fine_tune_model(qa_system, output_dir="./fine_tuned_model", num_train_epochs
             "use_peft": qa_system.use_peft,
             "use_rag": qa_system.use_rag,
             "base_model": MODEL_NAME,
+            "actual_epochs_trained": len(trainer.state.log_history),
+            "best_epoch": analysis.get("min_loss_epoch") if analysis and 'error' not in analysis else None,
+            "early_stopping": {
+                "patience": 5,
+                "recommendation": analysis.get("recommendation") if analysis and 'error' not in analysis else None
+            }
         }
-        json.dump(metadata, f)
+        json.dump(metadata, f, indent=2)
 
-def apply_peft(qa_system, output_dir="./peft_model", num_train_epochs=3, force_train=False):
-    """Apply Parameter-Efficient Fine-Tuning using LoRA"""
+def apply_peft(qa_system, output_dir="./peft_model", num_train_epochs=15, force_train=False):
+    """Apply Parameter-Efficient Fine-Tuning using LoRA with increased epochs for proper early stopping"""
     if not qa_system.use_peft:
         logger.info("PEFT is disabled. Skipping.")
         return

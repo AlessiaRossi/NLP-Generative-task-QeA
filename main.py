@@ -18,7 +18,7 @@ def build_system_from_scratch(qa_system):
     
     # Fine-tune if enabled
     if qa_system.use_fine_tuning:
-        qa_system.fine_tune(num_train_epochs=3)
+        qa_system.fine_tune(num_train_epochs=15)
     
     # Build and optimize retrieval components if RAG is enabled
     if qa_system.use_rag:
@@ -34,7 +34,7 @@ def build_system_from_scratch(qa_system):
     
     # Apply PEFT if enabled
     if qa_system.use_peft:
-        qa_system.apply_peft(num_train_epochs=3)
+        qa_system.apply_peft(num_train_epochs=15)
 
 def main():
     """Main function to run the BioAsq Q&A system"""
